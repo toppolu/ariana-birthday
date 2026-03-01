@@ -656,7 +656,7 @@ function introGame() {
                 <div style="background:rgba(106,76,147,.1);border-radius:16px;padding:11px 14px;margin-top:14px">
                   <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
                     <span style="font-size:22px;flex-shrink:0">2️⃣</span>
-                    <span style="font-weight:700;font-size:14px;color:#3a1060;line-height:1.45">Amazing! Now tap the purple <b>Claim Crystal</b> button below to earn your first 💎!</span>
+                    <span style="font-weight:700;font-size:14px;color:#3a1060;line-height:1.45">Amazing! Now tap the <b>Claim Crystal</b> button below to earn your first 💎!</span>
                   </div>
                   <div style="text-align:center;font-size:24px">👇</div>
                 </div>
