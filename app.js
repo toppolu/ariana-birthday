@@ -278,7 +278,6 @@ function renderDoors() {
       btn.disabled = false;
       badge.textContent = opened ? "✅" : "✨";
       if (opened) btn.classList.add("door-zone--opened");
-      if (today === i) btn.classList.add("door-zone--today");
       btn.addEventListener("click", () => openDay(i));
     }
 
@@ -656,7 +655,7 @@ function introGame() {
                 <div style="background:rgba(106,76,147,.1);border-radius:16px;padding:11px 14px;margin-top:14px">
                   <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
                     <span style="font-size:22px;flex-shrink:0">2️⃣</span>
-                    <span style="font-weight:700;font-size:14px;color:#3a1060;line-height:1.45">Amazing! Now tap the <b>Claim Crystal</b> button below to earn your first 💎!</span>
+                    <span style="font-weight:700;font-size:14px;color:#3a1060;line-height:1.45">Amazing! Now tap the purple <b>Claim Crystal</b> button below to earn your first 💎!</span>
                   </div>
                   <div style="text-align:center;font-size:24px">👇</div>
                 </div>
@@ -694,7 +693,6 @@ function buildActivity(def) {
     case "next": return whatNextGame();
 
     case "memory": return memoryGame();
-    case "dressup": return dressUpGame();
     case "math": return mathQuestGame();
 
     case "pet": return petSalonGame();
@@ -967,111 +965,6 @@ function memoryGame() {
     } else {
       setMsg(`Good! ${input.length}/${seq.length}`);
     }
-  }
-
-  function setMsg(t){ document.getElementById("msg").textContent = t; }
-  function reset(root){ mount(root); }
-
-  return { mount, reset, isComplete: () => claimBtn.disabled === false };
-}
-
-// ---- Dress Up ----
-function dressUpGame() {
-  const themes = [
-    { name:"Royal Explorer", must:["🧢 Hat","🧥 Jacket","🥾 Boots"] },
-    { name:"Starlight Party", must:["👗 Dress","✨ Sparkle","👠 Shoes"] },
-    { name:"Rainbow Picnic", must:["👚 Top","🩳 Shorts","🎀 Bow"] },
-  ];
-
-  const items = {
-    "Hair": ["💇 Hair A","💇‍♀️ Hair B","💇‍♀️ Hair C"],
-    "Outfit": ["👗 Dress","🧥 Jacket","👚 Top","🧦 Cozy Set"],
-    "Shoes": ["👟 Sneakers","🥾 Boots","👠 Shoes"],
-    "Extras": ["🎀 Bow","✨ Sparkle","🧢 Hat","👜 Bag"]
-  };
-
-  let theme = null;
-  let chosen = new Set();
-
-  function mount(root) {
-    theme = randPick(themes);
-    chosen = new Set();
-    root.innerHTML = `
-      <div class="gameTitle">Unicorn Dress-Up</div>
-      <div class="small">Theme: <b>${theme.name}</b> — choose the 3 matching items.</div>
-      <div class="sep"></div>
-      <div class="center" style="gap:10px">
-        <div class="big">🦄</div>
-        <div>
-          <div style="font-weight:900">Your Unicorn</div>
-          <div class="small" id="chosenLine">Chosen: none</div>
-        </div>
-      </div>
-      <div class="sep"></div>
-      <div id="tabs" class="row"></div>
-      <div id="tray" class="row" style="margin-top:10px"></div>
-      <div class="sep"></div>
-      <div class="small" id="msg"></div>
-      <button class="btn btn--secondary" id="doneBtn" style="width:100%; margin-top:10px" disabled>Done</button>
-    `;
-    renderTabs(root);
-    renderTray("Outfit");
-    setMsg("Pick items that match the theme.");
-    setClaimEnabled(false, "Match the theme to claim your crystal 💎");
-
-    document.getElementById("doneBtn").addEventListener("click", () => {
-      // require exactly theme.must
-      const ok = theme.must.every(x => chosen.has(x)) && chosen.size === 3;
-      if (ok) {
-        playChime();
-        setMsg("Perfect theme match! 🎉");
-        setClaimEnabled(true, "Claim your crystal 💎");
-      } else {
-        setMsg("Almost! Try to match the theme items exactly.");
-      }
-    });
-  }
-
-  function renderTabs() {
-    const tabs = document.getElementById("tabs");
-    tabs.innerHTML = "";
-    Object.keys(items).forEach(cat=>{
-      const b=document.createElement("button");
-      b.className="chip";
-      b.textContent=cat;
-      b.addEventListener("click", ()=>renderTray(cat));
-      tabs.appendChild(b);
-    });
-  }
-
-  function renderTray(cat) {
-    const tray = document.getElementById("tray");
-    tray.innerHTML = "";
-    items[cat].forEach(item=>{
-      const b=document.createElement("button");
-      b.className="chip";
-      const selected = chosen.has(item);
-      b.textContent = selected ? `✅ ${item}` : item;
-      b.addEventListener("click", ()=>toggle(item));
-      tray.appendChild(b);
-    });
-  }
-
-  function toggle(item) {
-    if (chosen.has(item)) chosen.delete(item);
-    else {
-      if (chosen.size >= 3) { setMsg("You can only choose 3 items."); return; }
-      chosen.add(item);
-    }
-    const chosenLine = document.getElementById("chosenLine");
-    chosenLine.textContent = chosen.size ? `Chosen: ${Array.from(chosen).join(", ")}` : "Chosen: none";
-    document.getElementById("doneBtn").disabled = chosen.size !== 3;
-    setMsg("When you’re ready, tap Done.");
-
-    // re-render current tray to show checkmarks
-    // (simple: rerender Outfit; good enough)
-    // In a full app we’d track active tab.
-    renderTray("Outfit");
   }
 
   function setMsg(t){ document.getElementById("msg").textContent = t; }
