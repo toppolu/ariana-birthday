@@ -35,8 +35,8 @@ const QUEST = {
 
 const DAYS = [
   // day: 1..17
-  { type: "pattern", title: "Pattern Architect", crystalName: "Logic Crystal", affirm: "Your mind finds patterns others miss." },
-  { type: "logicgrid2", title: "Star Party Puzzle", crystalName: "Wisdom Crystal", affirm: "Your cleverness amazes everyone around you." },
+  { type: "intro", title: "Welcome to Crystal Quest! 🔮", crystalName: "Quest Crystal", affirm: "Your adventure begins today — let's go! 🚀" },
+  { type: "starparty_duo", title: "Star Party Puzzle ⭐", crystalName: "Wisdom Crystal", affirm: "Your cleverness amazes everyone around you." },
   { type: "mcd_gift", title: "Bubble Pop Math!", crystalName: "Star Crystal", affirm: "Your quick thinking is a superpower." },
 
   { type: "letter1", title: "A Message for You", crystalName: "Heart Crystal", affirm: "You are important. You are deeply loved." },
@@ -54,7 +54,7 @@ const DAYS = [
 
   { type: "cipher", title: "Secret Codebreaker", crystalName: "Code Crystal", affirm: "You cracked the code — wow!" },
 
-  { type: "amazon_gift", title: "Limited-Moves Maze", crystalName: "Planner Crystal", affirm: "You choose smart paths." },
+  { type: "amazon_gift", title: "Odd One Out!", crystalName: "Planner Crystal", affirm: "You spot what others miss — super smart! 🔍" },
   { type: "pattern2", title: "Creative Pattern Builder", crystalName: "Builder Crystal", affirm: "You build order from ideas." },
   { type: "logicgrid", title: "Logic Grid", crystalName: "Truth Crystal", affirm: "You use clues like a detective." },
 
@@ -379,10 +379,10 @@ function openDay(dayNum) {
   currentGame = buildActivity(def);
   currentGame.mount(stageBody);
 
-  // If already earned crystal, allow claim still (or show complete)
+  // Replay: crystal already earned — pre-enable so she can claim again without replaying
   if (state.crystals[dayNum]) {
     claimBtn.disabled = false;
-    hintText.textContent = "You already earned this crystal — you can claim again (just for fun).";
+    hintText.textContent = "You already earned this crystal — you can claim again (just for fun) 🏆";
   }
 }
 
@@ -499,15 +499,198 @@ function openVault() {
   setView("vault");
 }
 
+// ---------- Intro Game (Day 1) ----------
+function introGame() {
+  const steps = [
+    { emoji: "🎂", text: "Happy early birthday, Ariana!" },
+    { emoji: "🗓️", text: "Every day from March 1st to March 17th, a brand-new door opens just for you." },
+    { emoji: "🧩", text: "Behind each door is a fun puzzle or activity. Solve it to earn your reward!" },
+    { emoji: "💎", text: "Finish the activity → earn a shiny crystal. There are 17 to collect!" },
+    { emoji: "🎁", text: "Some doors hide extra-special surprises and gifts along the way… 👀" },
+    { emoji: "🚀", text: "Can you collect all 17 crystals by your birthday on March 17th? Let's find out!" },
+  ];
+
+  function mount(root) {
+    showIntro(root);
+  }
+
+  // ── Phase 1: Intro cards ─────────────────────────────────
+  function showIntro(root) {
+    root.innerHTML = `
+      <div class="gameTitle">Your Birthday Crystal Quest 🔮</div>
+      <div class="small" style="text-align:center">Here's how it works — read each card!</div>
+      <div class="sep"></div>
+      <div id="introSteps" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div class="sep"></div>
+      <button class="btn btn--primary" id="introBtn" style="width:100%;font-size:16px;display:none">
+        I'm ready — show me how! 🎮
+      </button>
+    `;
+    setClaimEnabled(false, "Read all the cards first!");
+    const container = document.getElementById("introSteps");
+    steps.forEach(({ emoji, text }, i) => {
+      const card = document.createElement("div");
+      card.style.cssText = "display:flex;align-items:flex-start;gap:12px;background:rgba(255,255,255,.8);border-radius:16px;padding:12px 14px;opacity:0;transform:translateY(10px);transition:opacity .35s ease,transform .35s ease";
+      card.innerHTML = `<span style="font-size:28px;line-height:1;flex-shrink:0">${emoji}</span><span style="font-size:14px;font-weight:700;line-height:1.5;color:#3a1060">${text}</span>`;
+      container.appendChild(card);
+      setTimeout(() => {
+        card.style.opacity = "1"; card.style.transform = "translateY(0)";
+        if (i === steps.length - 1) setTimeout(() => { playChime(); const b = document.getElementById("introBtn"); if (b) b.style.display = ""; }, 400);
+      }, 300 + i * 420);
+    });
+    document.getElementById("introBtn").addEventListener("click", () => showP1(root));
+  }
+
+  // ── Shared: practice frame renderer ─────────────────────
+  function practiceFrame(root, num, title, hint) {
+    root.innerHTML = `
+      <div class="gameTitle">${title}</div>
+      <div style="text-align:center;font-weight:900;font-size:12px;color:var(--accent);letter-spacing:.5px;margin-bottom:10px">PRACTICE ${num} / 3</div>
+      <div style="background:rgba(106,76,147,.1);border-radius:16px;padding:11px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center">
+        <span style="font-size:22px;flex-shrink:0">1️⃣</span>
+        <span style="font-weight:700;font-size:14px;color:#3a1060;line-height:1.45">${hint}</span>
+      </div>
+      <div id="practiceBody"></div>
+      <div class="small" style="text-align:center;min-height:20px;margin-top:10px" id="practiceMsg"></div>
+    `;
+    setClaimEnabled(false, "Solve the puzzle to keep going! 💎");
+    return document.getElementById("practiceBody");
+  }
+
+  function wrongTap(b, msg, text) {
+    b.style.transition = "transform .08s"; b.style.transform = "scale(.88)";
+    setTimeout(() => { b.style.transform = "scale(1)"; }, 160);
+    if (msg) { msg.textContent = text; setTimeout(() => { if (msg) msg.textContent = ""; }, 1100); }
+  }
+
+  // ── Practice 1: Find the crystal 💎 ─────────────────────
+  function showP1(root) {
+    const body = practiceFrame(root, 1, "Practice 1 — Find It! 🔍", "Tap the crystal! Which one is the 💎?");
+    const choices = shuffle(["💎", "🌸", "⭐", "🎵"]);
+    const grid = document.createElement("div");
+    grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:260px;margin:0 auto";
+    choices.forEach(item => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.style.cssText = "font-size:42px;padding:14px;border-radius:20px;width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center";
+      b.textContent = item;
+      b.onclick = () => {
+        const msg = document.getElementById("practiceMsg");
+        if (item === "💎") {
+          playChime();
+          b.style.transform = "scale(1.25)"; b.style.boxShadow = "0 0 0 4px #a855f7";
+          grid.querySelectorAll("button").forEach(x => x.disabled = true);
+          if (msg) msg.textContent = "✅ You found it!";
+          setTimeout(() => showP2(root), 900);
+        } else { wrongTap(b, msg, "Not that one — try again! 🙂"); }
+      };
+      grid.appendChild(b);
+    });
+    body.appendChild(grid);
+  }
+
+  // ── Practice 2: Count & Pick ⭐ ──────────────────────────
+  function showP2(root) {
+    const TARGET = "⭐", FILLER = "🌸", TOTAL = 9;
+    const count = 3 + Math.floor(Math.random() * 4); // 3–6
+    const items = shuffle([...Array(count).fill(TARGET), ...Array(TOTAL - count).fill(FILLER)]);
+    const choices = shuffle([count, count > 1 ? count - 1 : count + 2, count < TOTAL ? count + 1 : count - 2]);
+
+    const body = practiceFrame(root, 2, "Practice 2 — Count It! 🔢", "How many ⭐ do you see? Count them all, then tap the right number!");
+
+    const emojiGrid = document.createElement("div");
+    emojiGrid.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:210px;margin:0 auto 16px";
+    items.forEach(em => {
+      const s = document.createElement("span");
+      s.style.cssText = "font-size:30px;text-align:center;line-height:1.3";
+      s.textContent = em;
+      emojiGrid.appendChild(s);
+    });
+    body.appendChild(emojiGrid);
+
+    const choiceRow = document.createElement("div");
+    choiceRow.style.cssText = "display:flex;gap:14px;justify-content:center";
+    choices.forEach(n => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.style.cssText = "font-size:24px;font-weight:900;padding:12px 22px";
+      b.textContent = n;
+      b.onclick = () => {
+        const msg = document.getElementById("practiceMsg");
+        if (n === count) {
+          playChime();
+          b.style.transform = "scale(1.2)"; b.style.boxShadow = "0 0 0 4px #a855f7";
+          choiceRow.querySelectorAll("button").forEach(x => x.disabled = true);
+          if (msg) msg.textContent = `✅ Yes! There are ${count}!`;
+          setTimeout(() => showP3(root), 900);
+        } else { wrongTap(b, msg, "Count again — you've got this! 🙂"); }
+      };
+      choiceRow.appendChild(b);
+    });
+    body.appendChild(choiceRow);
+  }
+
+  // ── Practice 3: Tap 1 → 5 in order ─────────────────────
+  function showP3(root) {
+    const body = practiceFrame(root, 3, "Practice 3 — Tap in Order! 🔢", "Tap the numbers in order from 1 to 5!");
+    let next = 1;
+
+    const numGrid = document.createElement("div");
+    numGrid.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:280px;margin:0 auto 6px";
+    shuffle([1, 2, 3, 4, 5]).forEach(n => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.style.cssText = "font-size:26px;font-weight:900;width:58px;height:58px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0";
+      b.textContent = n;
+      b.onclick = () => {
+        const msg = document.getElementById("practiceMsg");
+        if (n === next) {
+          playChime();
+          b.style.background = "linear-gradient(135deg,#a855f7,#7c3aed)";
+          b.style.color = "#fff"; b.disabled = true;
+          next++;
+          if (next > 5) {
+            if (msg) msg.textContent = "✅ Perfect order!";
+            setTimeout(() => {
+              root.insertAdjacentHTML("beforeend", `
+                <div style="background:rgba(106,76,147,.1);border-radius:16px;padding:11px 14px;margin-top:14px">
+                  <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+                    <span style="font-size:22px;flex-shrink:0">2️⃣</span>
+                    <span style="font-weight:700;font-size:14px;color:#3a1060;line-height:1.45">Amazing! Now tap the purple <b>Claim Crystal</b> button below to earn your first 💎!</span>
+                  </div>
+                  <div style="text-align:center;font-size:24px">👇</div>
+                </div>
+              `);
+              setClaimEnabled(true, "👆 Tap here to claim your Quest Crystal! 💎");
+            }, 700);
+          } else {
+            if (msg) msg.textContent = `${next - 1}… now tap ${next}!`;
+          }
+        } else {
+          const msg = document.getElementById("practiceMsg");
+          wrongTap(b, msg, `Tap ${next} first! 🙂`);
+        }
+      };
+      numGrid.appendChild(b);
+    });
+    body.appendChild(numGrid);
+  }
+
+  function reset(root) { mount(root); }
+  return { mount, reset, isComplete: () => claimBtn.disabled === false };
+}
+
 // ---------- Activities (Simple implementations + placeholders) ----------
 function buildActivity(def) {
   switch (def.type) {
+    case "intro":   return introGame();
     case "pattern": return patternGame({ rounds: 7, title: "Pattern Architect" });
     case "pattern2": return patternGame({ rounds: 9, title: "Pattern Architect" });
 
     case "spatial": return spatialFitGame();
     case "logicgrid": return logicGridGame();
     case "logicgrid2": return logicGrid2Game();
+    case "starparty_duo": return starPartyDuoGame();
     case "next": return whatNextGame();
 
     case "memory": return memoryGame();
@@ -523,7 +706,7 @@ function buildActivity(def) {
     case "maze1": return mazeMovesGame({ targetMoves: 12, size: 5 });
     case "gift_mcd": return mazeMovesGame({ targetMoves: 12, size: 5 }); // legacy
     case "surprise": return petSalonGame();
-    case "amazon_gift": return mazeMovesGame({ targetMoves: 14, size: 6 });
+    case "amazon_gift": return finaleMastermindGame();
     case "maze2": return mazeMovesGame({ targetMoves: 14, size: 6 });
     case "gift_movies": return cipherGame();
     case "cipher": return cipherGame();
@@ -2171,6 +2354,136 @@ function logicGridGame() {
   return { mount, reset, isComplete: () => claimBtn.disabled === false };
 }
 
+// ---- Star Party Duo (Day 2: Part 1 easy → Part 2 hard) ----
+function starPartyDuoGame() {
+  let rootEl = null;
+  function mount(root) {
+    rootEl = root;
+    showPhase1();
+  }
+
+  function makeGrid(containerId, names, snacks, icons, selected, onSelect) {
+    const g = document.getElementById(containerId);
+    if (!g) return;
+    g.innerHTML = "";
+    names.forEach(name => {
+      const block = document.createElement("div");
+      block.style.cssText = "background:#ffffffcc;border:1.5px solid rgba(192,96,216,.18);border-radius:16px;padding:10px 12px";
+      const label = document.createElement("div");
+      label.style.cssText = "font-weight:900;font-size:14px;margin-bottom:8px";
+      label.textContent = `${icons[name]} ${name}`;
+      block.appendChild(label);
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:5px;flex-wrap:nowrap";
+      snacks.forEach(s => {
+        const b = document.createElement("button");
+        b.className = "chip";
+        const chosen = selected[name] === s;
+        b.style.cssText = `padding:5px 7px;font-size:11px;flex:1;${chosen ? "background:linear-gradient(135deg,#e8d5ff,#ffd6f5);border-color:rgba(192,96,216,.6);" : ""}`;
+        b.textContent = chosen ? `✅ ${s}` : s;
+        b.onclick = () => onSelect(name, s);
+        row.appendChild(b);
+      });
+      block.appendChild(row);
+      g.appendChild(block);
+    });
+  }
+
+  // ── Part 1: 3 unicorns, 3 snacks — easy clues ──────────
+  function showPhase1() {
+    const names  = ["Twinkle","Starfall","Moonbeam"];
+    const snacks = ["🍓 Strawberry","🍪 Cookie","🍰 Cake"];
+    const icons  = { Twinkle:"🌟", Starfall:"⭐", Moonbeam:"🌙" };
+    let sel = { Twinkle:null, Starfall:null, Moonbeam:null };
+
+    rootEl.innerHTML = `
+      <div class="gameTitle">⭐ Star Party — Part 1 of 2</div>
+      <div class="small">Three unicorns brought different snacks. Use the clues to figure out who brought what!</div>
+      <div class="sep"></div>
+      <div style="background:#ffffffdd;border:1px solid rgba(106,76,147,.14);border-radius:18px;padding:12px">
+        <div class="small" style="font-weight:800">🔎 Clues</div>
+        <ul class="small" style="margin:8px 0 0 18px;padding:0;color:var(--ink);font-weight:700;line-height:2">
+          <li>Moonbeam brought the <b>round</b> snack (🍪).</li>
+          <li>Twinkle did <b>not</b> bring Strawberry.</li>
+          <li>Starfall did <b>not</b> bring Cake.</li>
+        </ul>
+      </div>
+      <div class="sep"></div>
+      <div id="p1grid" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div class="sep"></div>
+      <div class="small" id="p1msg">Choose a snack for each unicorn 🦄</div>
+      <button class="btn btn--secondary" id="p1check" style="width:100%;margin-top:10px">✅ Check My Answer</button>
+    `;
+    setClaimEnabled(false, "Solve both parts to claim your Wisdom Crystal 💎");
+
+    const render = () => makeGrid("p1grid", names, snacks, icons, sel, (name, s) => { sel[name] = s; render(); });
+    render();
+
+    document.getElementById("p1check").onclick = () => {
+      const msg = document.getElementById("p1msg");
+      const vals = Object.values(sel);
+      if (vals.some(v => v === null))          { msg.textContent = "Pick a snack for every unicorn 🙂"; return; }
+      if (new Set(vals).size !== 3)            { msg.textContent = "Each snack can only belong to one unicorn 🙂"; return; }
+      if (sel["Moonbeam"] !== "🍪 Cookie")    { msg.textContent = "Re-read the clue about Moonbeam 🙂"; return; }
+      if (sel["Twinkle"]  === "🍓 Strawberry"){ msg.textContent = "Check the clue about Twinkle 🙂"; return; }
+      if (sel["Starfall"] === "🍰 Cake")       { msg.textContent = "Check the clue about Starfall 🙂"; return; }
+      playChime();
+      msg.textContent = "🎉 Part 1 solved! A fourth unicorn just arrived… get ready!";
+      document.getElementById("p1check").disabled = true;
+      setTimeout(() => showPhase2(), 1600);
+    };
+  }
+
+  // ── Part 2: 4 unicorns, 4 snacks — harder clues ────────
+  function showPhase2() {
+    const names  = ["Twinkle","Starfall","Moonbeam","Comet"];
+    const snacks = ["🍓 Strawberry","🍪 Cookie","🍰 Cake","🍬 Candy"];
+    const icons  = { Twinkle:"⭐", Starfall:"🌟", Moonbeam:"🌙", Comet:"☄️" };
+    // Solution: Twinkle=Cake, Starfall=Candy, Moonbeam=Strawberry, Comet=Cookie
+    let sel = { Twinkle:null, Starfall:null, Moonbeam:null, Comet:null };
+
+    rootEl.innerHTML = `
+      <div class="gameTitle">⭐ Star Party — Part 2 of 2</div>
+      <div class="small">A fourth unicorn joined the party! The clues are trickier — think carefully! 🧠</div>
+      <div class="sep"></div>
+      <div style="background:#ffffffdd;border:1px solid rgba(106,76,147,.14);border-radius:18px;padding:12px">
+        <div class="small" style="font-weight:800">🔎 Clues</div>
+        <ul class="small" style="margin:8px 0 0 18px;padding:0;color:var(--ink);font-weight:700;line-height:2">
+          <li>Starfall and Comet did <b>not</b> bring anything fruity.</li>
+          <li>Moonbeam's snack is <b>never</b> baked.</li>
+          <li>Twinkle's snack has <b>frosting and candles</b> on top.</li>
+          <li>Comet's snack is <b>perfectly round</b>.</li>
+        </ul>
+      </div>
+      <div class="sep"></div>
+      <div id="p2grid" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div class="sep"></div>
+      <div class="small" id="p2msg">Four unicorns, four snacks — you've got this! 🦄</div>
+      <button class="btn btn--secondary" id="p2check" style="width:100%;margin-top:10px">✅ Check My Answer</button>
+    `;
+
+    const render = () => makeGrid("p2grid", names, snacks, icons, sel, (name, s) => { sel[name] = s; render(); });
+    render();
+
+    document.getElementById("p2check").onclick = () => {
+      const msg = document.getElementById("p2msg");
+      const vals = Object.values(sel);
+      if (vals.some(v => v === null))           { msg.textContent = "Pick a snack for every unicorn 🙂"; return; }
+      if (new Set(vals).size !== 4)             { msg.textContent = "Each snack can only belong to one unicorn 🙂"; return; }
+      if (sel["Twinkle"]  !== "🍰 Cake")        { msg.textContent = "Re-read the clue about Twinkle's snack 🙂"; return; }
+      if (sel["Comet"]    !== "🍪 Cookie")      { msg.textContent = "Re-read the clue about Comet's snack 🙂"; return; }
+      if (sel["Moonbeam"] === "🍪 Cookie" || sel["Moonbeam"] === "🍰 Cake") { msg.textContent = "Remember — Moonbeam's snack is never baked 🙂"; return; }
+      if (sel["Starfall"] === "🍓 Strawberry")  { msg.textContent = "Check the clue about fruity snacks 🙂"; return; }
+      playChime();
+      msg.textContent = "🎉 Incredible detective work! You solved BOTH puzzles!";
+      setClaimEnabled(true, "Claim your Wisdom Crystal 💎");
+    };
+  }
+
+  function reset(root) { mount(root); }
+  return { mount, reset, isComplete: () => claimBtn.disabled === false };
+}
+
 // ---- Logic Grid 2 (Star Party Puzzle — Day 2) ----
 function logicGrid2Game() {
   const names  = ["Twinkle","Starfall","Moonbeam"];
@@ -2258,124 +2571,252 @@ function logicGrid2Game() {
   return { mount, reset, isComplete: () => claimBtn.disabled === false };
 }
 
-// ---- Finale Mastermind (Amazon reward day) ----
+// ---- Mastermind Challenge (Amazon reward day) ----
 function finaleMastermindGame() {
-  const rainbow = ["🔴","🟠","🟡","🟢","🔵","🟣"];
+  let rootEl = null;
   let stage = 1;
-  let idx = 0;
 
-  function mount(root) {
-    stage = 1; idx = 0;
-    root.innerHTML = `
-      <div class="gameTitle">Final Mastermind</div>
-      <div class="small">Three challenges. You’ve got this.</div>
+  // ── Stage 1: Odd One Out ────────────────────────────────
+  const ODD_ROUNDS = [
+    { items: ["🍎","🍊","🍋","🐶"], odd: "🐶",  hint: "Three of these are fruits. Which one is NOT a fruit?" },
+    { items: ["🐶","🐱","🐸","🚗"], odd: "🚗",  hint: "Three of these are animals. Which one is NOT an animal?" },
+    { items: ["⭐","🌙","🌈","🍕"], odd: "🍕",  hint: "Three of these are in the sky. Which one is NOT?" },
+    { items: ["🎵","🎸","🥁","🌺"], odd: "🌺",  hint: "Three of these make music. Which one does NOT?" },
+    { items: ["🚂","🚀","🚗","🍔"], odd: "🍔",  hint: "Three of these are vehicles. Which one is NOT?" },
+  ];
+  let s1Round = 0;
+
+  function s1Init() { s1Round = 0; }
+
+  function s1Mount() {
+    rootEl.innerHTML = `
+      <div class="gameTitle">Stage 1 / 3 — Odd One Out 🔍</div>
+      <div class="small">Find the one that doesn't belong — 4 rounds!</div>
       <div class="sep"></div>
-      <div id="panel" style="background:#ffffffdd; border:1px solid rgba(106,76,147,.14); border-radius:18px; padding:12px"></div>
-      <div class="sep"></div>
-      <div class="small" id="msg"></div>
+      <div id="s1panel"></div>
+      <div class="small" style="margin-top:12px;text-align:center;min-height:20px" id="s1msg"></div>
     `;
-    setClaimEnabled(false, "Finish all 3 to unlock the treasure 💎");
-    render();
+    setClaimEnabled(false, "Complete all 3 stages to unlock your reward 💎");
+    s1Render();
   }
 
-  function render() {
-    const panel = document.getElementById("panel");
+  function s1Render() {
+    const panel = document.getElementById("s1panel");
+    if (!panel) return;
+    const r = ODD_ROUNDS[s1Round];
     panel.innerHTML = "";
-    if (stage === 1) {
-      panel.innerHTML = `
-        <div style="font-weight:900">Stage 1/3: Rainbow Order</div>
-        <div class="small">Tap colors in order: red → orange → yellow → green → blue → purple.</div>
-        <div class="sep"></div>
-        <div class="row" id="colors"></div>
-        <div class="small" style="margin-top:10px">Progress: <b id="prog">${idx}</b>/6</div>
-      `;
-      const row = panel.querySelector("#colors");
-      shuffle(rainbow).forEach(c=>{
-        const b=document.createElement("button");
-        b.className="chip";
-        b.textContent=c;
-        b.onclick=()=>tapColor(c);
-        row.appendChild(b);
-      });
-      setMsg("Go in rainbow order 🌈");
-    } else if (stage === 2) {
-      panel.innerHTML = `
-        <div style="font-weight:900">Stage 2/3: Final Pattern</div>
-        <div class="small">What comes next?</div>
-        <div class="sep"></div>
-        <div class="big center" style="gap:10px; flex-wrap:wrap; padding:10px 0">🦄 🌈 ⭐ 🦄 🌈 ?</div>
-        <div class="row" id="opts" style="margin-top:10px"></div>
-      `;
-      const opts = panel.querySelector("#opts");
-      const correct = "⭐";
-      const choices = shuffle(["⭐","💖","🎀","☁️","🧁"]).slice(0,3);
-      if (!choices.includes(correct)) choices[0] = correct;
-      shuffle(choices).forEach(o=>{
-        const b=document.createElement("button");
-        b.className="chip";
-        b.textContent=o;
-        b.onclick=()=> {
-          if (o===correct) { playChime(); stage=3; render(); }
-          else setMsg("Almost — it repeats in a cycle 🙂");
-        };
-        opts.appendChild(b);
-      });
-      setMsg("Find the repeating cycle.");
-    } else {
-      panel.innerHTML = `
-        <div style="font-weight:900">Stage 3/3: Secret Word</div>
-        <div class="small">Type the word: <b>BRILLIANT</b></div>
-        <div class="sep"></div>
-      `;
-      const input=document.createElement("input");
-      input.placeholder="Type here…";
-      input.style.width="100%";
-      input.style.padding="14px 12px";
-      input.style.borderRadius="14px";
-      input.style.border="1px solid rgba(106,76,147,.18)";
-      input.style.fontSize="16px";
-      panel.appendChild(input);
 
-      const btn=document.createElement("button");
-      btn.className="btn btn--primary";
-      btn.style.width="100%";
-      btn.style.marginTop="10px";
-      btn.textContent="Unlock Treasure";
-      btn.onclick=()=>{
-        const v=(input.value||"").trim().toUpperCase();
-        if (v==="BRILLIANT") {
-          playChime();
-          setMsg("TREASURE UNLOCKED! 🎉");
-          setClaimEnabled(true, "Claim your reward 💎");
-        } else {
-          setMsg("Almost — check the spelling 🙂");
-        }
-      };
-      panel.appendChild(btn);
-      setMsg("You’re so close!");
-    }
+    const roundLabel = document.createElement("div");
+    roundLabel.style.cssText = "text-align:center;font-weight:900;font-size:13px;color:var(--accent);margin-bottom:8px";
+    roundLabel.textContent = `Round ${s1Round + 1} / ${ODD_ROUNDS.length}`;
+    panel.appendChild(roundLabel);
+
+    const hint = document.createElement("div");
+    hint.style.cssText = "text-align:center;font-weight:700;font-size:14px;margin-bottom:16px;line-height:1.4";
+    hint.textContent = r.hint;
+    panel.appendChild(hint);
+
+    const grid = document.createElement("div");
+    grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:270px;margin:0 auto";
+    shuffle([...r.items]).forEach(item => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.style.cssText = "font-size:42px;padding:14px;border-radius:20px;width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center";
+      b.textContent = item;
+      b.onclick = () => s1Tap(b, item);
+      grid.appendChild(b);
+    });
+    panel.appendChild(grid);
   }
 
-  function tapColor(c) {
-    if (c === rainbow[idx]) {
-      idx++;
+  function s1Tap(btn, item) {
+    const r = ODD_ROUNDS[s1Round];
+    const msg = document.getElementById("s1msg");
+    if (item === r.odd) {
       playChime();
-      document.getElementById("prog").textContent = idx;
-      if (idx >= rainbow.length) {
-        stage = 2;
-        render();
+      btn.style.transform = "scale(1.25)";
+      btn.style.boxShadow = "0 0 0 4px #a855f7";
+      if (msg) msg.textContent = "✅ That's the one!";
+      s1Round++;
+      if (s1Round >= ODD_ROUNDS.length) {
+        setTimeout(() => { stage = 2; s2Mount(); }, 900);
       } else {
-        setMsg("Nice!");
+        setTimeout(() => { if (msg) msg.textContent = ""; s1Render(); }, 750);
       }
     } else {
-      idx = 0;
-      setMsg("Oops — restart the rainbow order 🙂");
-      render();
+      btn.style.transition = "transform .08s";
+      btn.style.transform = "scale(.88)";
+      setTimeout(() => { btn.style.transform = "scale(1)"; }, 160);
+      if (msg) { msg.textContent = "Hmm, try again! 🙂"; setTimeout(() => { if (msg) msg.textContent = ""; }, 1100); }
     }
   }
 
-  function setMsg(t){ document.getElementById("msg").textContent=t; }
-  function reset(root){ mount(root); }
+  // ── Stage 2: Flash Memory ───────────────────────────────
+  const MEM_POOL = ["⭐","🦄","🌈","💎","🌸","🎀","🧁","🎵"];
+  const MEM_LEN = 5;
+  let memSeq = [], memInput = [], memBusy = false;
+
+  function s2Mount() {
+    memSeq = shuffle([...MEM_POOL]).slice(0, MEM_LEN);
+    memInput = []; memBusy = false;
+    rootEl.innerHTML = `
+      <div class="gameTitle">Stage 2 / 3 — Flash Memory ⚡</div>
+      <div class="small">Watch the sequence flash one by one, then tap them back in order!</div>
+      <div class="sep"></div>
+      <div class="center" id="flasher" style="font-size:66px;min-height:84px;transition:transform .15s ease,opacity .15s ease">👁️</div>
+      <div class="sep"></div>
+      <div class="row center" id="memBtns" style="justify-content:center;gap:10px;flex-wrap:wrap"></div>
+      <button class="btn btn--secondary" id="replayBtn" style="width:100%;margin-top:12px;display:none">👁️ Replay sequence</button>
+      <div class="small" style="margin-top:12px;text-align:center;min-height:20px" id="memMsg">Get ready…</div>
+    `;
+    setClaimEnabled(false, "Complete all 3 stages to unlock your reward 💎");
+    setTimeout(() => s2ShowSeq(), 700);
+  }
+
+  async function s2ShowSeq() {
+    memBusy = true; memInput = [];
+    const flasher = document.getElementById("flasher");
+    const btns = document.getElementById("memBtns");
+    const msg = document.getElementById("memMsg");
+    const replay = document.getElementById("replayBtn");
+    if (btns) btns.innerHTML = "";
+    if (replay) replay.style.display = "none";
+    if (msg) msg.textContent = "Watch carefully… 👀";
+    for (let i = 0; i < memSeq.length; i++) {
+      await sleep(280);
+      if (!document.getElementById("flasher")) return;
+      if (flasher) { flasher.textContent = memSeq[i]; flasher.style.transform = "scale(1.35)"; flasher.style.opacity = "1"; }
+      await sleep(660);
+      if (!document.getElementById("flasher")) return;
+      if (flasher) { flasher.style.transform = "scale(1)"; flasher.style.opacity = "0.15"; flasher.textContent = "·"; }
+      await sleep(240);
+    }
+    memBusy = false;
+    if (document.getElementById("flasher")) {
+      if (flasher) { flasher.textContent = "❓"; flasher.style.opacity = "1"; }
+      if (msg) msg.textContent = "Now tap them in order! 👇";
+      const replayBtn = document.getElementById("replayBtn");
+      if (replayBtn) { replayBtn.style.display = ""; replayBtn.onclick = () => s2ShowSeq(); }
+      s2RenderBtns();
+    }
+  }
+
+  function s2RenderBtns() {
+    const btns = document.getElementById("memBtns");
+    if (!btns) return;
+    btns.innerHTML = "";
+    shuffle([...memSeq]).forEach(e => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.style.fontSize = "26px";
+      b.textContent = e;
+      b.onclick = () => s2Tap(e);
+      btns.appendChild(b);
+    });
+  }
+
+  function s2Tap(e) {
+    if (memBusy) return;
+    const flasher = document.getElementById("flasher");
+    const msg = document.getElementById("memMsg");
+    if (e !== memSeq[memInput.length]) {
+      memInput = [];
+      if (flasher) { flasher.textContent = "❌"; flasher.style.transform = "scale(1.25)"; }
+      if (msg) msg.textContent = "Not quite — watch again! 👁️";
+      const btns = document.getElementById("memBtns");
+      if (btns) btns.innerHTML = "";
+      setTimeout(() => { if (flasher) flasher.style.transform = "scale(1)"; s2ShowSeq(); }, 900);
+    } else {
+      memInput.push(e);
+      if (flasher) { flasher.textContent = e; flasher.style.transform = "scale(1.2)"; }
+      setTimeout(() => { if (flasher) flasher.style.transform = "scale(1)"; }, 200);
+      if (memInput.length === memSeq.length) {
+        playChime();
+        if (msg) msg.textContent = "🎉 Perfect memory!";
+        setTimeout(() => { stage = 3; s3Mount(); }, 900);
+      } else {
+        if (msg) msg.textContent = `${memInput.length} / ${memSeq.length} — keep going!`;
+      }
+    }
+  }
+
+  // ── Stage 3: Emoji Cipher ───────────────────────────────
+  // Decode: 🌟=S  🦄=M  💎=A  🌺=R  ⭐=T  → SMART
+  const CIPHER_MAP = [
+    { em: "🌟", lt: "S" }, { em: "🦄", lt: "M" }, { em: "💎", lt: "A" },
+    { em: "🌺", lt: "R" }, { em: "⭐", lt: "T" },
+  ];
+  const CIPHER_ENCODED = ["🌟","🦄","💎","🌺","⭐"];
+  const CIPHER_ANSWER  = "SMART";
+  let s3Input = [];
+
+  function s3Mount() {
+    s3Input = [];
+    const keyHtml = shuffle([...CIPHER_MAP]).map(({ em, lt }) =>
+      `<span style="font-size:20px">${em}</span><span style="font-weight:900;color:var(--accent);font-size:14px"> = ${lt}</span>`
+    ).join(" &nbsp; ");
+    rootEl.innerHTML = `
+      <div class="gameTitle">Stage 3 / 3 — Crystal Decoder 🔑</div>
+      <div class="small">Use the key to decode the secret word — tap letters in order!</div>
+      <div class="sep"></div>
+      <div style="background:#fff8ff;border-radius:14px;padding:10px 14px;text-align:center;line-height:2.6;margin-bottom:4px">${keyHtml}</div>
+      <div class="center" style="gap:10px;font-size:36px;margin:10px 0">${CIPHER_ENCODED.map(e=>`<span>${e}</span>`).join("")}</div>
+      <div class="small" style="text-align:center;margin-bottom:6px">↓ Tap the decoded letters in order ↓</div>
+      <div class="center" id="s3draft" style="gap:8px;margin:10px 0;min-height:44px;flex-wrap:wrap"></div>
+      <div class="row center" id="s3btns" style="justify-content:center;gap:8px;margin-top:8px;flex-wrap:wrap"></div>
+      <button class="btn btn--secondary" id="s3clr" style="width:100%;margin-top:10px">Clear</button>
+      <div class="small" style="margin-top:10px;text-align:center;min-height:20px" id="s3msg">Decode the emoji word above!</div>
+    `;
+    setClaimEnabled(false, "Decode the word to claim your reward 💎");
+    s3RenderBtns();
+    s3UpdateDraft();
+    document.getElementById("s3clr").onclick = () => { s3Input = []; s3UpdateDraft(); };
+  }
+
+  function s3RenderBtns() {
+    const btns = document.getElementById("s3btns");
+    if (!btns) return;
+    btns.innerHTML = "";
+    shuffle(CIPHER_MAP.map(x => x.lt)).forEach(lt => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.style.fontSize = "18px";
+      b.style.fontWeight = "900";
+      b.textContent = lt;
+      b.onclick = () => s3Tap(lt);
+      btns.appendChild(b);
+    });
+  }
+
+  function s3Tap(lt) {
+    if (s3Input.length >= CIPHER_ENCODED.length) return;
+    s3Input.push(lt);
+    s3UpdateDraft();
+    if (s3Input.length === CIPHER_ENCODED.length) {
+      const msg = document.getElementById("s3msg");
+      if (s3Input.join("") === CIPHER_ANSWER) {
+        playChime();
+        if (msg) msg.textContent = `🎉 You decoded "${CIPHER_ANSWER}"! You’re so smart!`;
+        setClaimEnabled(true, "Claim your Amazon reward 💎");
+      } else {
+        if (msg) msg.textContent = "Not quite — try again!";
+        setTimeout(() => { s3Input = []; s3UpdateDraft(); if (msg) msg.textContent = "Decode the emoji word above!"; }, 850);
+      }
+    }
+  }
+
+  function s3UpdateDraft() {
+    const draft = document.getElementById("s3draft");
+    if (!draft) return;
+    draft.innerHTML = CIPHER_ENCODED.map((_, i) => {
+      const filled = !!s3Input[i];
+      return `<span style="font-size:22px;font-weight:900;width:30px;text-align:center;border-bottom:3px solid rgba(106,76,147,.3);display:inline-block;padding-bottom:2px;color:${filled ? "var(--accent)" : "inherit"}">${s3Input[i] || "_"}</span>`;
+    }).join("");
+  }
+
+  // ── Root ────────────────────────────────────────────────
+  function mount(root) { rootEl = root; stage = 1; s1Init(); s1Mount(); }
+  function reset(root) { mount(root); }
   return { mount, reset, isComplete: () => claimBtn.disabled === false };
 }
 
