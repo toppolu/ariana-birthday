@@ -2535,6 +2535,7 @@ function logicGrid2Game() {
 function finaleMastermindGame() {
   let rootEl = null;
   let stage = 1;
+  let s2Gen = 0; // generation counter — incremented each time Stage 2 mounts, so stale async calls exit cleanly
 
   // ── Stage 1: Odd One Out ────────────────────────────────
   const ODD_ROUNDS = [
@@ -2551,7 +2552,7 @@ function finaleMastermindGame() {
   function s1Mount() {
     rootEl.innerHTML = `
       <div class="gameTitle">Stage 1 / 3 — Odd One Out 🔍</div>
-      <div class="small">Find the one that doesn't belong — 4 rounds!</div>
+      <div class="small">Find the one that doesn't belong — 5 rounds!</div>
       <div class="sep"></div>
       <div id="s1panel"></div>
       <div class="small" style="margin-top:12px;text-align:center;min-height:20px" id="s1msg"></div>
@@ -2617,6 +2618,8 @@ function finaleMastermindGame() {
   let memSeq = [], memInput = [], memBusy = false;
 
   function s2Mount() {
+    s2Gen++;                  // invalidate any previous s2ShowSeq still sleeping
+    const myGen = s2Gen;
     memSeq = shuffle([...MEM_POOL]).slice(0, MEM_LEN);
     memInput = []; memBusy = false;
     rootEl.innerHTML = `
@@ -2630,10 +2633,11 @@ function finaleMastermindGame() {
       <div class="small" style="margin-top:12px;text-align:center;min-height:20px" id="memMsg">Get ready…</div>
     `;
     setClaimEnabled(false, "Complete all 3 stages to unlock your reward 💎");
-    setTimeout(() => s2ShowSeq(), 700);
+    setTimeout(() => s2ShowSeq(myGen), 700);
   }
 
-  async function s2ShowSeq() {
+  async function s2ShowSeq(gen) {
+    if (gen !== s2Gen) return;          // stale call from a previous session — bail out
     memBusy = true; memInput = [];
     const flasher = document.getElementById("flasher");
     const btns = document.getElementById("memBtns");
@@ -2644,19 +2648,20 @@ function finaleMastermindGame() {
     if (msg) msg.textContent = "Watch carefully… 👀";
     for (let i = 0; i < memSeq.length; i++) {
       await sleep(280);
-      if (!document.getElementById("flasher")) return;
+      if (gen !== s2Gen || !document.getElementById("flasher")) { memBusy = false; return; }
       if (flasher) { flasher.textContent = memSeq[i]; flasher.style.transform = "scale(1.35)"; flasher.style.opacity = "1"; }
       await sleep(660);
-      if (!document.getElementById("flasher")) return;
+      if (gen !== s2Gen || !document.getElementById("flasher")) { memBusy = false; return; }
       if (flasher) { flasher.style.transform = "scale(1)"; flasher.style.opacity = "0.15"; flasher.textContent = "·"; }
       await sleep(240);
+      if (gen !== s2Gen || !document.getElementById("flasher")) { memBusy = false; return; }
     }
     memBusy = false;
-    if (document.getElementById("flasher")) {
+    if (gen === s2Gen && document.getElementById("flasher")) {
       if (flasher) { flasher.textContent = "❓"; flasher.style.opacity = "1"; }
       if (msg) msg.textContent = "Now tap them in order! 👇";
       const replayBtn = document.getElementById("replayBtn");
-      if (replayBtn) { replayBtn.style.display = ""; replayBtn.onclick = () => s2ShowSeq(); }
+      if (replayBtn) { replayBtn.style.display = ""; replayBtn.onclick = () => s2ShowSeq(s2Gen); }
       s2RenderBtns();
     }
   }
@@ -2685,7 +2690,7 @@ function finaleMastermindGame() {
       if (msg) msg.textContent = "Not quite — watch again! 👁️";
       const btns = document.getElementById("memBtns");
       if (btns) btns.innerHTML = "";
-      setTimeout(() => { if (flasher) flasher.style.transform = "scale(1)"; s2ShowSeq(); }, 900);
+      setTimeout(() => { if (flasher) flasher.style.transform = "scale(1)"; s2ShowSeq(s2Gen); }, 900);
     } else {
       memInput.push(e);
       if (flasher) { flasher.textContent = e; flasher.style.transform = "scale(1.2)"; }
