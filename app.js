@@ -1814,121 +1814,141 @@ function petSalonGame() {
   return { mount, reset, isComplete: () => claimBtn.disabled === false };
 }
 
-// ---- Sticker Mosaic (Symmetry + Balance) ----
+// ---- Mirror Magic (Sticker Mirror Symmetry) ----
 function stickerMosaicGame() {
-  const size = 5;
-  const stickers = ["⭐","💖","🌈","🦄"];
-  let board = Array.from({length:size}, ()=>Array(size).fill(""));
-  let target = null;
+  const ROWS = 5;
+  const COLS = 5; // cols per side — left grid and right grid are each 5×5
+  const STICKERS = ["⭐","💖","🌈","🦄","🎀","🦋","🌸"];
+  let leftPattern = null; // [ROWS][COLS] — the given left side
+  let playerBoard = null; // [ROWS][COLS] — player fills the right side
+  let selectedSticker = STICKERS[0];
   let round = 1;
-  let selectedSticker = "⭐";
+  const ROUNDS = 3;
 
-  function genTarget() {
-    const t = Array.from({length:size}, ()=>Array(size).fill(""));
-    for (let y=0;y<size;y++){
-      for (let x=0;x<size;x++){
-        if (Math.random()<0.4){
-          const s = stickers[Math.floor(Math.random()*stickers.length)];
-          t[y][x]=s;
-          t[size-1-y][size-1-x]=s; // 180° symmetry (harder than mirror)
-        }
-      }
-    }
-    return t;
+  function genLeft() {
+    return Array.from({length: ROWS}, () =>
+      Array.from({length: COLS}, () =>
+        Math.random() < 0.65 ? STICKERS[Math.floor(Math.random() * STICKERS.length)] : ""
+      )
+    );
   }
+
+  // Mirror: right col 0 = left col 1, right col 1 = left col 0
+  function mirrorOf(r, c) { return leftPattern[r][COLS - 1 - c]; }
 
   function mount(root) {
-    round=1;
-    board = Array.from({length:size}, ()=>Array(size).fill(""));
-    target = genTarget();
+    round = 1;
+    leftPattern = genLeft();
+    playerBoard = Array.from({length: ROWS}, () => Array(COLS).fill(""));
+    render(root);
+    setClaimEnabled(false, "Complete all 3 mirrors to earn your crystal 💎");
+  }
+
+  function render(root) {
     root.innerHTML = `
-      <div class="gameTitle">Sticker Mosaic</div>
-      <div class="small">Copy the pattern below into your mosaic! Round <b id="roundNum">1</b>/3</div>
+      <div class="gameTitle">Mirror Magic 🪞</div>
+      <div class="small">Round <b>${round}</b>/${ROUNDS} — Fill in the <b>mirror image</b> on the right!</div>
       <div class="sep"></div>
-      <div class="small" style="font-weight:800; margin-bottom:6px">✨ Pattern to copy:</div>
-      <div id="targetGrid" style="display:grid; grid-template-columns:repeat(${size},1fr); gap:6px;"></div>
+      <div style="display:grid; grid-template-columns:1fr 28px 1fr; gap:6px; align-items:start">
+        <div>
+          <div class="small" style="font-weight:800; text-align:center; margin-bottom:6px">Original ✨</div>
+          <div id="leftGrid" style="display:grid; grid-template-columns:repeat(${COLS},1fr); gap:4px;"></div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; padding-top:30px; gap:0">
+          <div style="font-size:20px; line-height:1">🪞</div>
+          <div style="width:2px; background:rgba(192,96,216,0.3); border-radius:2px; height:180px; margin-top:4px"></div>
+        </div>
+        <div>
+          <div class="small" style="font-weight:800; text-align:center; margin-bottom:6px">Your mirror</div>
+          <div id="rightGrid" style="display:grid; grid-template-columns:repeat(${COLS},1fr); gap:4px;"></div>
+        </div>
+      </div>
       <div class="sep"></div>
-      <div class="small" style="font-weight:800; margin-bottom:6px">🎨 Your mosaic:</div>
-      <div id="your" style="display:grid; grid-template-columns:repeat(${size},1fr); gap:6px;"></div>
-      <div class="sep"></div>
+      <div class="small" style="font-weight:700; margin-bottom:6px">Pick a sticker:</div>
       <div class="row" id="tray"></div>
-      <div class="small" id="msg" style="margin-top:10px"></div>
-      <button class="btn btn--secondary" id="checkBtn" style="width:100%; margin-top:10px">Check ✓</button>
+      <div class="small" id="msg" style="margin-top:10px; min-height:20px"></div>
+      <button class="btn btn--secondary" id="checkBtn" style="width:100%; margin-top:10px">Check Mirror ✓</button>
     `;
-    renderTarget(); renderYour(); renderTray();
-    setClaimEnabled(false,"Complete 3 mosaics 💎");
-    document.getElementById("checkBtn").onclick=check;
+    renderGrids(root);
+    renderTray(root);
+    root.querySelector("#checkBtn").onclick = () => check(root);
   }
 
-  function renderTarget(){
-    const tEl=document.getElementById("targetGrid");
-    tEl.innerHTML="";
-    for(let y=0;y<size;y++){
-      for(let x=0;x<size;x++){
-        const c=document.createElement("div");
-        c.style.aspectRatio="1/1";
-        c.style.borderRadius="12px";
-        c.style.background="rgba(106,76,147,.08)";
-        c.style.border="1px solid rgba(106,76,147,.18)";
-        c.style.display="flex";
-        c.style.alignItems="center";
-        c.style.justifyContent="center";
-        c.style.fontSize="18px";
-        c.textContent=target[y][x]||"";
-        tEl.appendChild(c);
+  function renderGrids(root) {
+    const leftEl  = root.querySelector("#leftGrid");
+    const rightEl = root.querySelector("#rightGrid");
+    if (!leftEl || !rightEl) return;
+    leftEl.innerHTML = "";
+    rightEl.innerHTML = "";
+
+    const base = `aspect-ratio:1/1; border-radius:7px; font-size:16px;
+      display:flex; align-items:center; justify-content:center;
+      border:1.5px solid rgba(106,76,147,.2);`;
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        // Left cell (given)
+        const lCell = document.createElement("div");
+        lCell.style.cssText = base + "background:rgba(162,100,220,0.12);";
+        lCell.textContent = leftPattern[r][c] || "";
+        leftEl.appendChild(lCell);
+
+        // Right cell (player fills)
+        const filled = playerBoard[r][c];
+        const rCell = document.createElement("button");
+        rCell.style.cssText = base + (filled
+          ? "background:rgba(255,210,255,0.85);"
+          : "background:rgba(255,255,255,0.65);");
+        rCell.textContent = filled || "";
+        rCell.onclick = () => {
+          playerBoard[r][c] = playerBoard[r][c] === selectedSticker ? "" : selectedSticker;
+          renderGrids(root);
+        };
+        rightEl.appendChild(rCell);
       }
     }
   }
 
-  function renderYour(){
-    const yEl=document.getElementById("your");
-    yEl.innerHTML="";
-    for(let y=0;y<size;y++){
-      for(let x=0;x<size;x++){
-        const c=document.createElement("button");
-        c.style.aspectRatio="1/1";
-        c.style.borderRadius="12px";
-        c.style.fontSize="18px";
-        c.textContent=board[y][x]||" ";
-        c.onclick=()=>{board[y][x]=selectedSticker; renderYour();};
-        yEl.appendChild(c);
-      }
-    }
-  }
-
-  function renderTray(){
-    const tray=document.getElementById("tray");
-    tray.innerHTML="";
-    stickers.forEach(s=>{
-      const b=document.createElement("button");
-      b.className="chip";
-      b.textContent=s;
-      b.onclick=()=>{selectedSticker=s;};
+  function renderTray(root) {
+    const tray = root.querySelector("#tray");
+    if (!tray) return;
+    tray.innerHTML = "";
+    STICKERS.forEach(s => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = s;
+      b.style.fontSize = "20px";
+      b.style.outline = s === selectedSticker ? "3px solid rgba(192,96,216,0.75)" : "none";
+      b.onclick = () => { selectedSticker = s; renderTray(root); };
       tray.appendChild(b);
     });
   }
 
-  function check(){
-    for(let y=0;y<size;y++){
-      for(let x=0;x<size;x++){
-        if(board[y][x]!==target[y][x]){document.getElementById("msg").textContent="Not quite 🙂";return;}
+  function check(root) {
+    const msg = root.querySelector("#msg");
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (playerBoard[r][c] !== mirrorOf(r, c)) {
+          if (msg) msg.textContent = "Not quite — check the mirror again! 🪞";
+          return;
+        }
       }
     }
+    playChime();
     round++;
-    if(round>3){
-      document.getElementById("msg").textContent="Amazing symmetry skills 🎉";
-      setClaimEnabled(true,"Claim crystal 💎");
+    if (round > ROUNDS) {
+      if (msg) msg.textContent = "🎉 You're a mirror master!";
+      setClaimEnabled(true, "Claim your crystal 💎");
     } else {
-      board = Array.from({length:size}, ()=>Array(size).fill(""));
-      target = genTarget();
-      document.getElementById("roundNum").textContent = round;
-      renderTarget(); renderYour();
-      document.getElementById("msg").textContent="Nice! Next pattern…";
+      leftPattern = genLeft();
+      playerBoard = Array.from({length: ROWS}, () => Array(COLS).fill(""));
+      if (msg) msg.textContent = "✅ Perfect mirror! Next one…";
+      setTimeout(() => render(root), 900);
     }
   }
 
-  function reset(root){mount(root);}
-  return {mount,reset,isComplete:()=>claimBtn.disabled===false};
+  function reset(root) { mount(root); }
+  return { mount, reset, isComplete: () => claimBtn.disabled === false };
 }
 
 // ---- Mini Escape Room (3 locks) ----
@@ -2290,7 +2310,7 @@ function starPartyDuoGame() {
     let sel = { Twinkle:null, Starfall:null, Moonbeam:null };
 
     rootEl.innerHTML = `
-      <div class="gameTitle">⭐ Star Party — Part 1 of 2</div>
+      <div class="gameTitle">⭐ Star Party — Part 1 of 3</div>
       <div class="small">Three unicorns brought different snacks. Use the clues to figure out who brought what!</div>
       <div class="sep"></div>
       <div style="background:#ffffffdd;border:1px solid rgba(106,76,147,.14);border-radius:18px;padding:12px">
@@ -2336,7 +2356,7 @@ function starPartyDuoGame() {
     let sel = { Twinkle:null, Starfall:null, Moonbeam:null, Comet:null };
 
     rootEl.innerHTML = `
-      <div class="gameTitle">⭐ Star Party — Part 2 of 2</div>
+      <div class="gameTitle">⭐ Star Party — Part 2 of 3</div>
       <div class="small">A fourth unicorn joined the party! The clues are trickier — think carefully! 🧠</div>
       <div class="sep"></div>
       <div style="background:#ffffffdd;border:1px solid rgba(106,76,147,.14);border-radius:18px;padding:12px">
@@ -2368,7 +2388,54 @@ function starPartyDuoGame() {
       if (sel["Moonbeam"] === "🍪 Cookie" || sel["Moonbeam"] === "🍰 Cake") { msg.textContent = "Remember — Moonbeam's snack is never baked 🙂"; return; }
       if (sel["Starfall"] === "🍓 Strawberry")  { msg.textContent = "Check the clue about fruity snacks 🙂"; return; }
       playChime();
-      msg.textContent = "🎉 Incredible detective work! You solved BOTH puzzles!";
+      msg.textContent = "🎉 Amazing! Now the Mario crew shows up… one final challenge!";
+      document.getElementById("p2check").disabled = true;
+      setTimeout(() => showPhase3(), 1600);
+    };
+  }
+
+  // ── Part 3: Mario characters, 4 snacks — hardest clues ──
+  function showPhase3() {
+    const names  = ["Mario","Luigi","Peach","Rosalina"];
+    const snacks = ["🍰 Cake","🍭 Lollipop","🍦 Ice Cream","🥐 Croissant"];
+    const icons  = { Mario:"🔴", Luigi:"🟢", Peach:"👑", Rosalina:"✨" };
+    // Solution: Mario=🍦 Ice Cream, Luigi=🥐 Croissant, Peach=🍰 Cake, Rosalina=🍭 Lollipop
+    let sel = { Mario:null, Luigi:null, Peach:null, Rosalina:null };
+
+    rootEl.innerHTML = `
+      <div class="gameTitle">⭐ Star Party — Part 3 of 3</div>
+      <div class="small">The Mario crew joined the party! This is the final — and trickiest — challenge! 🧠🍄</div>
+      <div class="sep"></div>
+      <div style="background:#ffffffdd;border:1px solid rgba(106,76,147,.14);border-radius:18px;padding:12px">
+        <div class="small" style="font-weight:800">🔎 Clues</div>
+        <ul class="small" style="margin:8px 0 0 18px;padding:0;color:var(--ink);font-weight:700;line-height:2">
+          <li>Rosalina and Mario didn't bring anything <b>baked</b>.</li>
+          <li>Peach didn't bring anything on a <b>stick</b>.</li>
+          <li>Luigi's snack is <b>warm</b> and freshly baked.</li>
+          <li>Rosalina's treat is <b>round and comes on a stick</b>.</li>
+        </ul>
+      </div>
+      <div class="sep"></div>
+      <div id="p3grid" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div class="sep"></div>
+      <div class="small" id="p3msg">Four characters, four snacks — you've got this! 🌟</div>
+      <button class="btn btn--secondary" id="p3check" style="width:100%;margin-top:10px">✅ Check My Answer</button>
+    `;
+
+    const render = () => makeGrid("p3grid", names, snacks, icons, sel, (name, s) => { sel[name] = s; render(); });
+    render();
+
+    document.getElementById("p3check").onclick = () => {
+      const msg = document.getElementById("p3msg");
+      const vals = Object.values(sel);
+      if (vals.some(v => v === null))          { msg.textContent = "Pick a snack for every character 🙂"; return; }
+      if (new Set(vals).size !== 4)            { msg.textContent = "Each snack can only belong to one character 🙂"; return; }
+      if (sel["Luigi"]    !== "🥐 Croissant") { msg.textContent = "Re-read the clue about Luigi's snack 🙂"; return; }
+      if (sel["Rosalina"] !== "🍭 Lollipop")  { msg.textContent = "Re-read the clue about Rosalina's treat 🙂"; return; }
+      if (sel["Peach"]    !== "🍰 Cake")      { msg.textContent = "Remember — Peach didn't bring anything on a stick 🙂"; return; }
+      if (sel["Mario"]    !== "🍦 Ice Cream") { msg.textContent = "Check what's left for Mario 🙂"; return; }
+      playChime();
+      msg.textContent = "🎉 You solved ALL THREE puzzles! You're a true logic master!";
       setClaimEnabled(true, "Claim your Wisdom Crystal 💎");
     };
   }
@@ -2471,11 +2538,11 @@ function finaleMastermindGame() {
 
   // ── Stage 1: Odd One Out ────────────────────────────────
   const ODD_ROUNDS = [
-    { items: ["🍎","🍊","🍋","🐶"], odd: "🐶",  hint: "Three of these are fruits. Which one is NOT a fruit?" },
-    { items: ["🐶","🐱","🐸","🚗"], odd: "🚗",  hint: "Three of these are animals. Which one is NOT an animal?" },
-    { items: ["⭐","🌙","🌈","🍕"], odd: "🍕",  hint: "Three of these are in the sky. Which one is NOT?" },
-    { items: ["🎵","🎸","🥁","🌺"], odd: "🌺",  hint: "Three of these make music. Which one does NOT?" },
-    { items: ["🚂","🚀","🚗","🍔"], odd: "🍔",  hint: "Three of these are vehicles. Which one is NOT?" },
+    { items: ["🐬","🦇","🐸","🐋"], odd: "🐸",  hint: "Mammals are warm-blooded, breathe air, and feed their babies milk. Which one is NOT a mammal?" },
+    { items: ["🐜","🐞","🐝","🕷️"], odd: "🕷️", hint: "Insects always have exactly 6 legs. Which one here is NOT an insect?" },
+    { items: ["🕯️","💡","🔦","🌙"], odd: "🌙", hint: "Three of these are human inventions designed to light up the dark. Which one was NOT invented by humans?" },
+    { items: ["🥕","🥔","🧅","🍓"], odd: "🍓", hint: "Some foods grow underground beneath the soil. Which one grows above the ground instead?" },
+    { items: ["🔴","🔵","🟡","🟢"], odd: "🟢", hint: "One of these colors can be made by mixing two of the others together. Which one is it?" },
   ];
   let s1Round = 0;
 
